@@ -1,0 +1,164 @@
+---
+title: "HW1 Tom Tsukerman"
+format:
+  html:
+    theme: default
+---
+
+```{r}
+library(DBI)
+library(dplyr)
+library(dbplyr)
+library(odbc)
+library(RSQLite)
+```
+
+# Q1
+
+```{r upload_SQL_database}
+setwd("C:\\Users\\user\\Desktop\\SQL Assigment")
+
+con_chocolate <- DBI::dbConnect(drv = RSQLite::SQLite(),
+                                dbname = "chocolate.sqlite")
+
+```
+
+Let's look at our tables
+
+```{r look_at_data}
+
+salesreps <- dbGetQuery(con_chocolate, "SELECT * FROM salesreps LIMIT 5")
+salesreps
+
+products <- dbGetQuery(con_chocolate, "SELECT * FROM products LIMIT 5")
+products
+
+customers <- dbGetQuery(con_chocolate, "SELECT * FROM Customers LIMIT 5")
+customers
+
+orders <- dbGetQuery(con_chocolate, "SELECT * FROM orders LIMIT 5")
+orders
+
+```
+
+## Q1 Section 1
+
+The Client want to know the details of the customer who has spent the most on candy bars since 01/01/2023
+
+## Q1 Section 2
+
+```{r}
+q1_query <- "WITH total_orders AS (
+    SELECT cid, SUM(Price * amount) AS sum_total
+    FROM orders
+    LEFT JOIN products USING (pid)
+    WHERE (sale_date > '2023-01-01')
+    GROUP BY cid
+)
+SELECT *
+FROM total_orders
+LEFT JOIN customers USING (cid)
+ORDER BY sum_total DESC
+LIMIT 1
+"
+
+q1_answer <- dbGetQuery(con_chocolate, q1_query)
+q1_answer
+
+```
+
+The customer who got the most candy bars since 01/01/2023 is Joshua Beieler that got total sum of 1057.03 USD. \# Q2
+
+# Q2
+
+## Q2 - Section 1
+
+```{r Q2_s1}
+q2_s1 <- "
+WITH sales_by_rep AS (
+  -- Calculate total sales for each sales representative
+  SELECT salesperson.srid AS salesperson_id, 
+         salesperson.Name AS sales_rep_name , 
+         salesperson.year_joined AS year_joined, 
+         COUNT(*) AS total_sales
+  FROM salesreps AS salesperson
+  INNER JOIN orders AS order_record ON salesperson.srid = order_record.srid
+  GROUP BY salesperson.srid
+),
+avg_sales_by_year AS (
+  -- Calculate average sales for each recruitment year
+  SELECT year_joined, AVG(total_sales) AS avg_sales
+  FROM sales_by_rep
+  GROUP BY year_joined
+),
+ranked_reps AS (
+  -- Rank sales representatives who sold more than the average in their recruitment year
+  SELECT sales_by_rep.salesperson_id, 
+         sales_by_rep.sales_rep_name , 
+         sales_by_rep.total_sales, 
+         sales_by_rep.year_joined,
+         avg_sales_by_year.avg_sales,
+         RANK() OVER(PARTITION BY sales_by_rep.year_joined ORDER BY sales_by_rep.total_sales DESC) AS rank_in_year
+  FROM sales_by_rep
+  JOIN avg_sales_by_year ON sales_by_rep.year_joined = avg_sales_by_year.year_joined
+  WHERE sales_by_rep.total_sales > avg_sales_by_year.avg_sales
+)
+SELECT salesperson_id, sales_rep_name , total_sales, year_joined
+FROM ranked_reps
+WHERE rank_in_year = 1;
+"
+
+q1_s1_answer <- dbGetQuery(con_chocolate, q2_s1)
+q1_s1_answer
+
+```
+
+The table show the best sales rep that made most sales for each year
+
+## Q2 - Section 2
+
+```{r Q2_s2}
+q2_s2 <- "
+SELECT customers.cid, customers.Name, SUM(products.Price * orders.amount) AS total_spent
+FROM orders
+JOIN products ON orders.pid = products.pid
+JOIN customers ON orders.cid = customers.cid
+GROUP BY customers.cid
+ORDER BY total_spent DESC
+LIMIT 1;
+"
+
+q1_s2_answer <- dbGetQuery(con_chocolate, q2_s2)
+q1_s2_answer
+
+```
+
+Kyle Demby is the customer who made the latgest purcahase of 2005.1 USD
+
+## Q2 - Section 3
+
+```{r Q2_s3}
+q2_s3 <- "
+WITH sales_rep_sales AS (
+  SELECT orders.srid AS salesperson_id, products.pid AS product_id, products.candy_names, SUM(orders.amount) AS total_sold
+  FROM orders
+  JOIN products ON orders.pid = products.pid
+  GROUP BY orders.srid, products.pid
+),
+ranked_candy_sales AS (
+  SELECT salesperson_id, product_id, candy_names, total_sold,
+         RANK() OVER(PARTITION BY salesperson_id ORDER BY total_sold DESC) AS rank
+  FROM sales_rep_sales
+)
+SELECT rcs.salesperson_id, sr.Name AS sales_rep_name, rcs.candy_names, rcs.total_sold
+FROM ranked_candy_sales rcs
+JOIN salesreps sr ON rcs.salesperson_id = sr.srid
+WHERE rcs.rank = 1;
+"
+
+
+q1_s3_answer <- dbGetQuery(con_chocolate, q2_s3)
+q1_s3_answer
+```
+
+The table show each sales rep with the candy that he sold most of.
