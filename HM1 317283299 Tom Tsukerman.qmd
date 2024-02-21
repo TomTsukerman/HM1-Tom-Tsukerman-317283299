@@ -133,7 +133,7 @@ q1_s2_answer
 
 ```
 
-Kyle Demby is the customer who made the latgest purcahase of 2005.1 USD
+Kyle Demby is the customer who made the largest purcahase of 2005.1 USD
 
 ## Q2 - Section 3
 
