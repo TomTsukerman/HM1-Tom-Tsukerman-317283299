@@ -16,10 +16,10 @@ library(RSQLite)
 # Q1
 
 ```{r upload_SQL_database}
-setwd("C:\\Users\\user\\Desktop\\SQL Assigment")
+sqlite_file_path <- file.choose() #Select to 'chocolate.sqlite' file to upload
 
 con_chocolate <- DBI::dbConnect(drv = RSQLite::SQLite(),
-                                dbname = "chocolate.sqlite")
+                                dbname = sqlite_file_path)
 
 ```
 
